@@ -1,2 +1,2 @@
 # jadoo
-https://github.com/Max98002/jadoo
+https://max98002.github.io/jadoo/dist/
