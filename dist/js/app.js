@@ -1,6 +1,6 @@
 (() => {
     "use strict";
-    const modules_flsModules = {};
+    const flsModules = {};
     function isWebp() {
         function testWebP(callback) {
             let webP = new Image;
@@ -121,6 +121,86 @@
             }), delay);
         }
     };
+    function spollers() {
+        const spollersArray = document.querySelectorAll("[data-spollers]");
+        if (spollersArray.length > 0) {
+            const spollersRegular = Array.from(spollersArray).filter((function(item, index, self) {
+                return !item.dataset.spollers.split(",")[0];
+            }));
+            if (spollersRegular.length) initSpollers(spollersRegular);
+            let mdQueriesArray = dataMediaQueries(spollersArray, "spollers");
+            if (mdQueriesArray && mdQueriesArray.length) mdQueriesArray.forEach((mdQueriesItem => {
+                mdQueriesItem.matchMedia.addEventListener("change", (function() {
+                    initSpollers(mdQueriesItem.itemsArray, mdQueriesItem.matchMedia);
+                }));
+                initSpollers(mdQueriesItem.itemsArray, mdQueriesItem.matchMedia);
+            }));
+            function initSpollers(spollersArray, matchMedia = false) {
+                spollersArray.forEach((spollersBlock => {
+                    spollersBlock = matchMedia ? spollersBlock.item : spollersBlock;
+                    if (matchMedia.matches || !matchMedia) {
+                        spollersBlock.classList.add("_spoller-init");
+                        initSpollerBody(spollersBlock);
+                        spollersBlock.addEventListener("click", setSpollerAction);
+                    } else {
+                        spollersBlock.classList.remove("_spoller-init");
+                        initSpollerBody(spollersBlock, false);
+                        spollersBlock.removeEventListener("click", setSpollerAction);
+                    }
+                }));
+            }
+            function initSpollerBody(spollersBlock, hideSpollerBody = true) {
+                let spollerTitles = spollersBlock.querySelectorAll("[data-spoller]");
+                if (spollerTitles.length) {
+                    spollerTitles = Array.from(spollerTitles).filter((item => item.closest("[data-spollers]") === spollersBlock));
+                    spollerTitles.forEach((spollerTitle => {
+                        if (hideSpollerBody) {
+                            spollerTitle.removeAttribute("tabindex");
+                            if (!spollerTitle.classList.contains("_spoller-active")) spollerTitle.nextElementSibling.hidden = true;
+                        } else {
+                            spollerTitle.setAttribute("tabindex", "-1");
+                            spollerTitle.nextElementSibling.hidden = false;
+                        }
+                    }));
+                }
+            }
+            function setSpollerAction(e) {
+                const el = e.target;
+                if (el.closest("[data-spoller]")) {
+                    const spollerTitle = el.closest("[data-spoller]");
+                    const spollersBlock = spollerTitle.closest("[data-spollers]");
+                    const oneSpoller = spollersBlock.hasAttribute("data-one-spoller");
+                    const spollerSpeed = spollersBlock.dataset.spollersSpeed ? parseInt(spollersBlock.dataset.spollersSpeed) : 500;
+                    if (!spollersBlock.querySelectorAll("._slide").length) {
+                        if (oneSpoller && !spollerTitle.classList.contains("_spoller-active")) hideSpollersBody(spollersBlock);
+                        spollerTitle.classList.toggle("_spoller-active");
+                        _slideToggle(spollerTitle.nextElementSibling, spollerSpeed);
+                    }
+                    e.preventDefault();
+                }
+            }
+            function hideSpollersBody(spollersBlock) {
+                const spollerActiveTitle = spollersBlock.querySelector("[data-spoller]._spoller-active");
+                const spollerSpeed = spollersBlock.dataset.spollersSpeed ? parseInt(spollersBlock.dataset.spollersSpeed) : 500;
+                if (spollerActiveTitle && !spollersBlock.querySelectorAll("._slide").length) {
+                    spollerActiveTitle.classList.remove("_spoller-active");
+                    _slideUp(spollerActiveTitle.nextElementSibling, spollerSpeed);
+                }
+            }
+            const spollersClose = document.querySelectorAll("[data-spoller-close]");
+            if (spollersClose.length) document.addEventListener("click", (function(e) {
+                const el = e.target;
+                if (!el.closest("[data-spollers]")) spollersClose.forEach((spollerClose => {
+                    const spollersBlock = spollerClose.closest("[data-spollers]");
+                    if (spollersBlock.classList.contains("_spoller-init")) {
+                        const spollerSpeed = spollersBlock.dataset.spollersSpeed ? parseInt(spollersBlock.dataset.spollersSpeed) : 500;
+                        spollerClose.classList.remove("_spoller-active");
+                        _slideUp(spollerClose.nextElementSibling, spollerSpeed);
+                    }
+                }));
+            }));
+        }
+    }
     function menuInit() {
         if (document.querySelector(".icon-menu")) document.addEventListener("click", (function(e) {
             if (bodyLockStatus && e.target.closest(".icon-menu")) {
@@ -129,10 +209,153 @@
             }
         }));
     }
-    function functions_FLS(message) {
+    function menuClose() {
+        bodyUnlock();
+        document.documentElement.classList.remove("menu-open");
+    }
+    function FLS(message) {
         setTimeout((() => {
             if (window.FLS) console.log(message);
         }), 0);
+    }
+    function uniqArray(array) {
+        return array.filter((function(item, index, self) {
+            return self.indexOf(item) === index;
+        }));
+    }
+    function dataMediaQueries(array, dataSetValue) {
+        const media = Array.from(array).filter((function(item, index, self) {
+            if (item.dataset[dataSetValue]) return item.dataset[dataSetValue].split(",")[0];
+        }));
+        if (media.length) {
+            const breakpointsArray = [];
+            media.forEach((item => {
+                const params = item.dataset[dataSetValue];
+                const breakpoint = {};
+                const paramsArray = params.split(",");
+                breakpoint.value = paramsArray[0];
+                breakpoint.type = paramsArray[1] ? paramsArray[1].trim() : "max";
+                breakpoint.item = item;
+                breakpointsArray.push(breakpoint);
+            }));
+            let mdQueries = breakpointsArray.map((function(item) {
+                return "(" + item.type + "-width: " + item.value + "px)," + item.value + "," + item.type;
+            }));
+            mdQueries = uniqArray(mdQueries);
+            const mdQueriesArray = [];
+            if (mdQueries.length) {
+                mdQueries.forEach((breakpoint => {
+                    const paramsArray = breakpoint.split(",");
+                    const mediaBreakpoint = paramsArray[1];
+                    const mediaType = paramsArray[2];
+                    const matchMedia = window.matchMedia(paramsArray[0]);
+                    const itemsArray = breakpointsArray.filter((function(item) {
+                        if (item.value === mediaBreakpoint && item.type === mediaType) return true;
+                    }));
+                    mdQueriesArray.push({
+                        itemsArray,
+                        matchMedia
+                    });
+                }));
+                return mdQueriesArray;
+            }
+        }
+    }
+    let gotoblock_gotoBlock = (targetBlock, noHeader = false, speed = 500, offsetTop = 0) => {
+        const targetBlockElement = document.querySelector(targetBlock);
+        if (targetBlockElement) {
+            let headerItem = "";
+            let headerItemHeight = 0;
+            if (noHeader) {
+                headerItem = "header.header";
+                const headerElement = document.querySelector(headerItem);
+                if (!headerElement.classList.contains("_header-scroll")) {
+                    headerElement.style.cssText = `transition-duration: 0s;`;
+                    headerElement.classList.add("_header-scroll");
+                    headerItemHeight = headerElement.offsetHeight;
+                    headerElement.classList.remove("_header-scroll");
+                    setTimeout((() => {
+                        headerElement.style.cssText = ``;
+                    }), 0);
+                } else headerItemHeight = headerElement.offsetHeight;
+            }
+            let options = {
+                speedAsDuration: true,
+                speed,
+                header: headerItem,
+                offset: offsetTop,
+                easing: "easeOutQuad"
+            };
+            document.documentElement.classList.contains("menu-open") ? menuClose() : null;
+            if ("undefined" !== typeof SmoothScroll) (new SmoothScroll).animateScroll(targetBlockElement, "", options); else {
+                let targetBlockElementPosition = targetBlockElement.getBoundingClientRect().top + scrollY;
+                targetBlockElementPosition = headerItemHeight ? targetBlockElementPosition - headerItemHeight : targetBlockElementPosition;
+                targetBlockElementPosition = offsetTop ? targetBlockElementPosition - offsetTop : targetBlockElementPosition;
+                window.scrollTo({
+                    top: targetBlockElementPosition,
+                    behavior: "smooth"
+                });
+            }
+            FLS(`[gotoBlock]: Юхуу...едем к ${targetBlock}`);
+        } else FLS(`[gotoBlock]: Ой ой..Такого блока нет на странице: ${targetBlock}`);
+    };
+    function formFieldsInit(options = {
+        viewPass: false,
+        autoHeight: false
+    }) {
+        const formFields = document.querySelectorAll("input[placeholder],textarea[placeholder]");
+        if (formFields.length) formFields.forEach((formField => {
+            if (!formField.hasAttribute("data-placeholder-nohide")) formField.dataset.placeholder = formField.placeholder;
+        }));
+        document.body.addEventListener("focusin", (function(e) {
+            const targetElement = e.target;
+            if ("INPUT" === targetElement.tagName || "TEXTAREA" === targetElement.tagName) {
+                if (targetElement.dataset.placeholder) targetElement.placeholder = "";
+                if (!targetElement.hasAttribute("data-no-focus-classes")) {
+                    targetElement.classList.add("_form-focus");
+                    targetElement.parentElement.classList.add("_form-focus");
+                }
+                formValidate.removeError(targetElement);
+            }
+        }));
+        document.body.addEventListener("focusout", (function(e) {
+            const targetElement = e.target;
+            if ("INPUT" === targetElement.tagName || "TEXTAREA" === targetElement.tagName) {
+                if (targetElement.dataset.placeholder) targetElement.placeholder = targetElement.dataset.placeholder;
+                if (!targetElement.hasAttribute("data-no-focus-classes")) {
+                    targetElement.classList.remove("_form-focus");
+                    targetElement.parentElement.classList.remove("_form-focus");
+                }
+                if (targetElement.hasAttribute("data-validate")) formValidate.validateInput(targetElement);
+            }
+        }));
+        if (options.viewPass) document.addEventListener("click", (function(e) {
+            let targetElement = e.target;
+            if (targetElement.closest('[class*="__viewpass"]')) {
+                let inputType = targetElement.classList.contains("_viewpass-active") ? "password" : "text";
+                targetElement.parentElement.querySelector("input").setAttribute("type", inputType);
+                targetElement.classList.toggle("_viewpass-active");
+            }
+        }));
+        if (options.autoHeight) {
+            const textareas = document.querySelectorAll("textarea[data-autoheight]");
+            if (textareas.length) {
+                textareas.forEach((textarea => {
+                    const startHeight = textarea.hasAttribute("data-autoheight-min") ? Number(textarea.dataset.autoheightMin) : Number(textarea.offsetHeight);
+                    const maxHeight = textarea.hasAttribute("data-autoheight-max") ? Number(textarea.dataset.autoheightMax) : 1 / 0;
+                    setHeight(textarea, Math.min(startHeight, maxHeight));
+                    textarea.addEventListener("input", (() => {
+                        if (textarea.scrollHeight > startHeight) {
+                            textarea.style.height = `auto`;
+                            setHeight(textarea, Math.min(Math.max(textarea.scrollHeight, startHeight), maxHeight));
+                        }
+                    }));
+                }));
+                function setHeight(textarea, height) {
+                    textarea.style.height = `${height}px`;
+                }
+            }
+        }
     }
     let formValidate = {
         getErrors(form) {
@@ -187,11 +410,11 @@
                     const checkbox = checkboxes[index];
                     checkbox.checked = false;
                 }
-                if (modules_flsModules.select) {
+                if (flsModules.select) {
                     let selects = form.querySelectorAll(".select");
                     if (selects.length) for (let index = 0; index < selects.length; index++) {
                         const select = selects[index].querySelector("select");
-                        modules_flsModules.select.selectBuild(select);
+                        flsModules.select.selectBuild(select);
                     }
                 }
             }), 0);
@@ -200,6 +423,71 @@
             return !/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,8})+$/.test(formRequiredItem.value);
         }
     };
+    function formSubmit() {
+        const forms = document.forms;
+        if (forms.length) for (const form of forms) {
+            form.addEventListener("submit", (function(e) {
+                const form = e.target;
+                formSubmitAction(form, e);
+            }));
+            form.addEventListener("reset", (function(e) {
+                const form = e.target;
+                formValidate.formClean(form);
+            }));
+        }
+        async function formSubmitAction(form, e) {
+            const error = !form.hasAttribute("data-no-validate") ? formValidate.getErrors(form) : 0;
+            if (0 === error) {
+                const ajax = form.hasAttribute("data-ajax");
+                if (ajax) {
+                    e.preventDefault();
+                    const formAction = form.getAttribute("action") ? form.getAttribute("action").trim() : "#";
+                    const formMethod = form.getAttribute("method") ? form.getAttribute("method").trim() : "GET";
+                    const formData = new FormData(form);
+                    form.classList.add("_sending");
+                    const response = await fetch(formAction, {
+                        method: formMethod,
+                        body: formData
+                    });
+                    if (response.ok) {
+                        let responseResult = await response.json();
+                        form.classList.remove("_sending");
+                        formSent(form, responseResult);
+                    } else {
+                        alert("Ошибка");
+                        form.classList.remove("_sending");
+                    }
+                } else if (form.hasAttribute("data-dev")) {
+                    e.preventDefault();
+                    formSent(form);
+                }
+            } else {
+                e.preventDefault();
+                if (form.querySelector("._form-error") && form.hasAttribute("data-goto-error")) {
+                    const formGoToErrorClass = form.dataset.gotoError ? form.dataset.gotoError : "._form-error";
+                    gotoblock_gotoBlock(formGoToErrorClass, true, 1e3);
+                }
+            }
+        }
+        function formSent(form, responseResult = ``) {
+            document.dispatchEvent(new CustomEvent("formSent", {
+                detail: {
+                    form
+                }
+            }));
+            setTimeout((() => {
+                if (flsModules.popup) {
+                    const popup = form.dataset.popupMessage;
+                    popup ? flsModules.popup.open(popup) : null;
+                }
+            }), 0);
+            formValidate.formClean(form);
+            formLogging(`Форма отправлена!`);
+        }
+        function formLogging(message) {
+            FLS(`[Формы]: ${message}`);
+        }
+    }
     class SelectConstructor {
         constructor(props, data = null) {
             let defaultConfig = {
@@ -510,10 +798,10 @@
             }));
         }
         setLogging(message) {
-            this.config.logging ? functions_FLS(`[select]: ${message}`) : null;
+            this.config.logging ? FLS(`[select]: ${message}`) : null;
         }
     }
-    modules_flsModules.select = new SelectConstructor({});
+    flsModules.select = new SelectConstructor({});
     let addWindowScrollEvent = false;
     setTimeout((() => {
         if (addWindowScrollEvent) {
@@ -623,4 +911,10 @@
     window["FLS"] = true;
     isWebp();
     menuInit();
+    spollers();
+    formFieldsInit({
+        viewPass: false,
+        autoHeight: false
+    });
+    formSubmit();
 })();
